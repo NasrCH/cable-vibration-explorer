@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibrations de câble — modèles physiques et formule personnalisable</title>
+<style>
+  :root {
+    --bg: #faf9f5;
+    --surface: #ffffff;
+    --surface-1: #f1efe8;
+    --border: #e0ded4;
+    --border-strong: #c9c7bc;
+    --text-primary: #1a1a18;
+    --text-secondary: #5f5e5a;
+    --text-muted: #888780;
+    --accent: #534AB7;
+    --danger: #a32d2d;
+    --danger-bg: #fcebeb;
+    --radius: 8px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #262624;
+      --surface: #30302e;
+      --surface-1: #3a3a37;
+      --border: #45443f;
+      --border-strong: #5a594f;
+      --text-primary: #f5f4ef;
+      --text-secondary: #b4b2a9;
+      --text-muted: #888780;
+      --accent: #7f77dd;
+      --danger: #f09595;
+      --danger-bg: #3a2020;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text-primary);
+    font-family: var(--font-sans); line-height: 1.6; padding: 2rem 1rem;
+  }
+  .container { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 500; margin: 0 0 4px; }
+  h2 { font-size: 16px; font-weight: 500; margin: 1.75rem 0 0.75rem; }
+  .subtitle { color: var(--text-secondary); font-size: 15px; margin: 0 0 1.5rem; }
+
+  .panel { background: var(--surface-1); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
+  label.fld { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+  textarea, input.txt {
+    width: 100%; font-family: var(--font-mono); font-size: 15px;
+    background: var(--surface); color: var(--text-primary);
+    border: 0.5px solid var(--border-strong); border-radius: var(--radius);
+    padding: 10px 12px; resize: vertical;
+  }
+  textarea { min-height: 52px; }
+  .hint { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+  .hint code { background: var(--surface); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .presets button, .apply-btn {
+    font-family: var(--font-sans); font-size: 13px; cursor: pointer;
+    background: var(--surface); color: var(--text-primary);
+    border: 0.5px solid var(--border-strong); border-radius: var(--radius);
+    padding: 6px 12px; transition: background .15s;
+  }
+  .presets button:hover, .apply-btn:hover { background: var(--border); }
+  .apply-btn { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 500; padding: 8px 18px; margin-top: 12px; }
+  .err { background: var(--danger-bg); color: var(--danger); border-radius: var(--radius); padding: 10px 12px; font-size: 13px; margin-top: 10px; display: none; }
+  .err.show { display: block; }
+
+  /* Segmented model selector */
+  .segmented { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1.25rem; }
+  .segmented button {
+    font-family: var(--font-sans); font-size: 13px; cursor: pointer;
+    background: var(--surface); color: var(--text-primary);
+    border: 0.5px solid var(--border-strong); border-radius: var(--radius);
+    padding: 8px 14px; transition: background .15s, border-color .15s;
+  }
+  .segmented button:hover { background: var(--border); }
+  .segmented button.active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 500; }
+
+  .opts { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 1rem; }
+  .opts .opt { display: flex; flex-direction: column; gap: 4px; }
+  .opts label { font-size: 13px; color: var(--text-secondary); }
+  .opts select {
+    font-family: var(--font-sans); font-size: 14px; padding: 6px 10px;
+    background: var(--surface); color: var(--text-primary);
+    border: 0.5px solid var(--border-strong); border-radius: var(--radius);
+  }
+  .model-desc { font-size: 13px; color: var(--text-secondary); margin: 0 0 1rem; }
+
+  .row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .row .name { font-family: var(--font-mono); font-size: 14px; font-weight: 500; min-width: 132px; }
+  .row .name .u { font-size: 11px; color: var(--text-muted); font-family: var(--font-sans); }
+  .row .ctl { flex: 1; display: flex; align-items: center; gap: 10px; }
+  input[type="range"] {
+    flex: 1; -webkit-appearance: none; appearance: none; height: 4px;
+    border-radius: 2px; background: var(--border-strong); outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 18px; height: 18px;
+    border-radius: 50%; background: var(--accent); cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 18px; height: 18px; border: none; border-radius: 50%; background: var(--accent); cursor: pointer;
+  }
+  .row .num { width: 90px; }
+  .row input.num {
+    font-family: var(--font-mono); font-size: 13px; text-align: right;
+    background: var(--surface); color: var(--text-primary);
+    border: 0.5px solid var(--border); border-radius: 6px; padding: 4px 8px; width: 100px;
+  }
+  .rng-cfg { font-size: 11px; color: var(--text-muted); display: flex; gap: 6px; align-items: center; }
+  .rng-cfg input { width: 62px; font-family: var(--font-mono); font-size: 11px; text-align: right;
+    background: var(--surface); color: var(--text-secondary); border: 0.5px solid var(--border); border-radius: 4px; padding: 2px 4px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0; }
+  .card { background: var(--surface-1); border-radius: var(--radius); padding: 1rem; }
+  .card .lbl { font-size: 13px; color: var(--text-secondary); }
+  .card .val { font-size: 24px; font-weight: 500; word-break: break-all; }
+  .card .unit { font-size: 12px; color: var(--text-muted); }
+
+  .derived { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 20px; }
+  .derived .d { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 3px 0; border-bottom: 0.5px solid var(--border); }
+  .derived .d .dl { color: var(--text-secondary); }
+  .derived .d .dv { font-family: var(--font-mono); }
+
+  table { width: 100%; font-size: 14px; border-collapse: collapse; margin-bottom: 16px; }
+  th { text-align: left; color: var(--text-secondary); font-weight: 500; padding: 6px 4px; border-bottom: 0.5px solid var(--border); }
+  td { padding: 6px 4px; border-bottom: 0.5px solid var(--border); }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+  .fam { font-size: 11px; color: var(--text-muted); }
+  .plot-wrap { background: var(--surface-1); border-radius: 12px; padding: 12px; }
+  svg { display: block; height: auto; width: 100%; }
+  .note { font-size: 13px; color: var(--text-muted); margin-top: 1.25rem; }
+  .note strong { color: var(--text-secondary); font-weight: 500; }
+  .refs { font-size: 12px; color: var(--text-muted); margin-top: 1rem; }
+  .refs li { margin-bottom: 3px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Vibrations d'un câble</h1>
+  <p class="subtitle">Fréquences propres et formes modales : corde idéale, raideur en flexion, câble avec flèche (Irvine), modèle couplé flèche + raideur (différences finies), ou ta propre formule.</p>
+
+  <div class="segmented" id="models"></div>
+
+  <p class="model-desc" id="modelDesc"></p>
+
+  <div class="opts" id="opts"></div>
+
+  <!-- Panneau formule personnalisée (modèle "custom" uniquement) -->
+  <div class="panel" id="formulaPanel" style="display:none;">
+    <label class="fld" for="formula">Formule de la fréquence du mode n — <code style="font-family:var(--font-mono)">f(n, ...)</code></label>
+    <textarea id="formula" spellcheck="false">(n / (2*L)) * sqrt(T / mu)</textarea>
+    <div class="err" id="err"></div>
+    <div class="hint">
+      Utilise <code>n</code> pour le numéro de mode. Fonctions dispo :
+      <code>sqrt</code> <code>sin</code> <code>cos</code> <code>tan</code> <code>exp</code> <code>log</code> <code>abs</code> <code>pow</code> <code>pi</code>.
+      Opérateurs : <code>+ - * / ^</code>. Les unités sont celles que tu saisis (aucune conversion automatique).
+    </div>
+    <div class="presets">
+      <button data-f="(n / (2*L)) * sqrt(T / mu)">Corde idéale</button>
+      <button data-f="(n / (2*L)) * sqrt(T / mu) * sqrt(1 + (n^2*pi^2*EI)/(T*L^2))">Appuis simples + EI</button>
+    </div>
+    <button class="apply-btn" id="apply">Appliquer la formule</button>
+  </div>
+
+  <h2>Paramètres</h2>
+  <div id="params"></div>
+
+  <div class="row" style="margin-top:16px;">
+    <span class="name">modes</span>
+    <div class="ctl">
+      <input type="range" id="Nmodes" min="1" max="10" value="4" step="1">
+      <span class="num" style="min-width:30px; text-align:right; font-family:var(--font-mono);" id="Nmodes_out">4</span>
+    </div>
+  </div>
+
+  <h2>Résultats</h2>
+  <div class="cards">
+    <div class="card">
+      <div class="lbl">Fréquence fondamentale f&#8321;</div>
+      <div class="val" id="f1_out">&mdash;</div>
+      <div class="unit" id="f1_unit">Hz</div>
+    </div>
+    <div class="card">
+      <div class="lbl">Rapport f&#8322;/f&#8321;</div>
+      <div class="val" id="ratio_out">&mdash;</div>
+      <div class="unit">2.000 = harmonique pur</div>
+    </div>
+  </div>
+
+  <h2>Grandeurs dérivées</h2>
+  <div class="panel"><div class="derived" id="derived"></div></div>
+
+  <table id="tbl"></table>
+
+  <h2>Formes modales</h2>
+  <div class="plot-wrap">
+    <svg id="svg" viewBox="0 0 640 260" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+
+  <p class="note" id="note"></p>
+
+  <ul class="refs">
+    <li>H.M. Irvine, T.K. Caughey, <em>The linear theory of free vibrations of a suspended cable</em>, Proc. R. Soc. Lond. A 341 (1974) 299-315.</li>
+    <li>H.M. Irvine, <em>Cable Structures</em>, MIT Press, 1981.</li>
+    <li>H. Zui, T. Shinke, Y. Namita, <em>Practical formulas for estimation of cable tension by vibration method</em>, J. Struct. Eng. 122(6) (1996).</li>
+    <li>A.B. Mehrabi, H. Tabatabai, <em>Unified finite difference formulation for free vibration of cables</em>, J. Struct. Eng. 124(11) (1998).</li>
+  </ul>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var G = 9.81; // m/s^2, gravitational acceleration used for cable weight
+  var palette = ["#534AB7","#1D9E75","#D85A30","#378ADD","#BA7517","#D4537E","#0F6E56","#993C1D","#5B6470","#8A5CD1"];
+  function g(id){ return document.getElementById(id); }
+
+  function fmt(x){
+    if(x === null || x === undefined || !isFinite(x)) return "—";
+    var a = Math.abs(x);
+    if(a !== 0 && (a < 1e-3 || a >= 1e5)) return x.toExponential(3);
+    return x.toFixed(3);
+  }
+
+  // ---------- Custom-formula evaluator (dependency-free) ----------
+  var SCOPE_FUNCS = {
+    sqrt: Math.sqrt, sin: Math.sin, cos: Math.cos, tan: Math.tan,
+    asin: Math.asin, acos: Math.acos, atan: Math.atan,
+    exp: Math.exp, log: Math.log, log10: Math.log10, abs: Math.abs,
+    pow: Math.pow, min: Math.min, max: Math.max, sinh: Math.sinh,
+    cosh: Math.cosh, tanh: Math.tanh, pi: Math.PI, e: Math.E, PI: Math.PI
+  };
+  var FUNC_NAMES = Object.keys(SCOPE_FUNCS);
+
+  // Compile an expression into a function whose only in-scope identifiers are
+  // the declared variables plus the whitelisted math functions. Any unknown
+  // identifier is rejected before Function() is built (safety gate).
+  function compile(expr, varNames){
+    var js = expr.replace(/\^/g, "**");
+    var idents = js.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
+    for(var i=0;i<idents.length;i++){
+      var id = idents[i];
+      if(varNames.indexOf(id) === -1 && FUNC_NAMES.indexOf(id) === -1){
+        throw new Error("Identifiant inconnu : « " + id + " »");
+      }
+    }
+    var argList = varNames.concat(FUNC_NAMES);
+    var fn = new Function(argList.join(","), "return (" + js + ");");
+    return function(scope){
+      var args = varNames.map(function(v){ return scope[v]; })
+                 .concat(FUNC_NAMES.map(function(f){ return SCOPE_FUNCS[f]; }));
+      return fn.apply(null, args);
+    };
+  }
+
+  function extractVars(expr){
+    var idents = expr.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
+    var seen = {}, vars = [];
+    idents.forEach(function(id){
+      if(id === "n") return;
+      if(FUNC_NAMES.indexOf(id) !== -1) return;
+      if(!seen[id]){ seen[id] = true; vars.push(id); }
+    });
+    return vars;
+  }
+
+  var VAR_DEFAULTS = {
+    T:  {val: 3e6,    min: 1e4,  max: 1e7,  step: 1e4,  unit: "N"},
+    H:  {val: 3e6,    min: 1e4,  max: 1e7,  step: 1e4,  unit: "N"},
+    mu: {val: 50,     min: 1,    max: 300,  step: 1,    unit: "kg/m"},
+    L:  {val: 100,    min: 5,    max: 500,  step: 1,    unit: "m"},
+    EI: {val: 1e6,    min: 0,    max: 1e8,  step: 1e5,  unit: "N·m²"},
+    EA: {val: 2e9,    min: 1e7,  max: 5e10, step: 1e8,  unit: "N"},
+    E:  {val: 2.1e11, min: 1e10, max: 3e11, step: 1e9,  unit: "Pa"},
+    I:  {val: 1e-5,   min: 1e-7, max: 1e-3, step: 1e-7, unit: "m⁴"},
+    A:  {val: 0.01,   min: 1e-4, max: 0.1,  step: 1e-4, unit: "m²"},
+    m:  {val: 50,     min: 1,    max: 300,  step: 1,    unit: "kg/m"}
+  };
+  function varDefault(name){
+    if(VAR_DEFAULTS[name]) return Object.assign({}, VAR_DEFAULTS[name]);
+    return {val: 1, min: 0, max: 10, step: 0.1, unit: ""};
+  }
+
+  // ---------- Mode-shape helpers ----------
+  function shapeSine(halfWaves){ // sin(n*pi*t), t = x/L
+    return function(t){ return Math.sin(halfWaves * Math.PI * t); };
+  }
+  function shapeIrvineSym(Om){ // in-plane symmetric mode (Irvine)
+    var tanHalf = Math.tan(Om/2);
+    return function(t){ return 1 - tanHalf * Math.sin(Om * t) - Math.cos(Om * t); };
+  }
+  // Shape from a finite-difference eigenvector (interior nodes 1..Ng, ends = 0),
+  // linearly interpolated over t = x/L in [0,1].
+  function shapeVector(phi, Ng){
+    function nodeVal(j){ if(j <= 0 || j >= Ng + 1) return 0; return phi[j - 1]; }
+    return function(t){
+      var p = t * (Ng + 1), lo = Math.floor(p), fr = p - lo;
+      return nodeVal(lo) * (1 - fr) + nodeVal(lo + 1) * fr;
+    };
+  }
+
+  // ---------- Irvine symmetric-mode eigenvalue solver (analytic model) ----------
+  // Om = omega*L*sqrt(mu/H). Symmetric modes: tan(Om/2) = Om/2 - (4/lambda2)(Om/2)^3.
+  // Multiplied by cos(Om/2) to remove tangent poles -> smooth, robust bisection.
+  function hSym(Om, lambda2){
+    var x = Om / 2;
+    return Math.sin(x) - (x - (4 / lambda2) * x * x * x) * Math.cos(x);
+  }
+  function findSymRoots(lambda2, count){
+    var roots = [], step = Math.PI / 400;
+    var Om = 1e-4, prevOm = Om, prev = hSym(Om, lambda2);
+    var maxOm = (count + 3) * 2 * Math.PI;
+    while(Om < maxOm && roots.length < count){
+      Om += step;
+      var cur = hSym(Om, lambda2);
+      if(prev === 0){ roots.push(prevOm); }
+      else if(prev * cur < 0){
+        var a = prevOm, b = Om, fa = prev;
+        for(var it = 0; it < 60; it++){
+          var mid = (a + b) / 2, fm = hSym(mid, lambda2);
+          if(fa * fm <= 0){ b = mid; } else { a = mid; fa = fm; }
+        }
+        roots.push((a + b) / 2);
+      }
+      prev = cur; prevOm = Om;
+    }
+    return roots;
+  }
+
+  // ---------- Finite-difference solver (combined sag + bending model) ----------
+  // Governing in-plane equation (Mehrabi & Tabatabai 1998), shallow cable:
+  //   EI v'''' - H v'' + (EA/Le)(w/H)^2 * integral(v dx) = m * omega^2 * v
+  // Discretized on Ng interior nodes; the sag term is a rank-one all-ones coupling.
+  // The resulting symmetric matrix A satisfies A*phi = m*omega^2*phi.
+  function buildFDMatrix(L, H, mu, EI, kc, bc, Ng){
+    var h = L / (Ng + 1), alpha = H / (h * h), beta = EI / (h * h * h * h);
+    var A = []; for(var i = 0; i < Ng; i++){ A.push(new Array(Ng).fill(0)); }
+    for(i = 0; i < Ng; i++){
+      // -H v'' : [-1 2 -1]*H/h^2
+      A[i][i] += 2 * alpha;
+      if(i - 1 >= 0) A[i][i - 1] += -alpha;
+      if(i + 1 < Ng) A[i][i + 1] += -alpha;
+      // EI v'''' : [1 -4 6 -4 1]*EI/h^4
+      A[i][i] += 6 * beta;
+      if(i - 1 >= 0) A[i][i - 1] += -4 * beta;
+      if(i + 1 < Ng) A[i][i + 1] += -4 * beta;
+      if(i - 2 >= 0) A[i][i - 2] += beta;
+      if(i + 2 < Ng) A[i][i + 2] += beta;
+    }
+    // Ghost-node correction at the two end nodes: pinned (v''=0) -> -1, fixed (v'=0) -> +1.
+    var ghost = (bc === "fixed") ? 1 : -1;
+    A[0][0] += ghost * beta;
+    A[Ng - 1][Ng - 1] += ghost * beta;
+    // Sag / elastic coupling: kc*h added to every entry (rank-one, symmetric).
+    if(kc > 0){
+      var add = kc * h;
+      for(i = 0; i < Ng; i++){ for(var j = 0; j < Ng; j++){ A[i][j] += add; } }
+    }
+    return A;
+  }
+
+  // Cyclic Jacobi eigensolver for a symmetric matrix. Returns eigenvalues and the
+  // eigenvector matrix V (column k is the eigenvector of values[k]).
+  function jacobiEig(Ain){
+    var n = Ain.length, a = Ain.map(function(r){ return r.slice(); });
+    var V = []; for(var i = 0; i < n; i++){ V.push(new Array(n).fill(0)); V[i][i] = 1; }
+    for(var sweep = 0; sweep < 100; sweep++){
+      var off = 0;
+      for(var p = 0; p < n; p++){ for(var q = p + 1; q < n; q++){ off += a[p][q] * a[p][q]; } }
+      if(off < 1e-18) break;
+      for(p = 0; p < n; p++){
+        for(q = p + 1; q < n; q++){
+          if(Math.abs(a[p][q]) < 1e-300) continue;
+          var phi = 0.5 * Math.atan2(2 * a[p][q], a[q][q] - a[p][p]);
+          var c = Math.cos(phi), s = Math.sin(phi), k;
+          for(k = 0; k < n; k++){ var akp = a[k][p], akq = a[k][q]; a[k][p] = c*akp - s*akq; a[k][q] = s*akp + c*akq; }
+          for(k = 0; k < n; k++){ var apk = a[p][k], aqk = a[q][k]; a[p][k] = c*apk - s*aqk; a[q][k] = s*apk + c*aqk; }
+          for(k = 0; k < n; k++){ var vkp = V[k][p], vkq = V[k][q]; V[k][p] = c*vkp - s*vkq; V[k][q] = s*vkp + c*vkq; }
+        }
+      }
+    }
+    var vals = []; for(i = 0; i < n; i++){ vals.push(a[i][i]); }
+    return { values: vals, vectors: V };
+  }
+
+  // Solve the FD eigenproblem and return the first N modes as {f, shape, phi}.
+  function solveFD(L, H, mu, EI, kc, bc, Ng, N){
+    var A = buildFDMatrix(L, H, mu, EI, kc, bc, Ng);
+    var e = jacobiEig(A);
+    var order = [];
+    for(var i = 0; i < e.values.length; i++){ if(e.values[i] > 0) order.push(i); }
+    order.sort(function(x, y){ return e.values[x] - e.values[y]; });
+    var out = [];
+    for(var k = 0; k < N && k < order.length; k++){
+      var idx = order[k];
+      var omega2 = e.values[idx] / mu;
+      var phi = e.vectors.map(function(row){ return row[idx]; });
+      // Normalize sign: largest-magnitude component positive (stable display).
+      var mi = 0; for(var j = 1; j < phi.length; j++){ if(Math.abs(phi[j]) > Math.abs(phi[mi])) mi = j; }
+      if(phi[mi] < 0){ phi = phi.map(function(v){ return -v; }); }
+      out.push({ f: Math.sqrt(omega2) / (2 * Math.PI), shape: shapeVector(phi, Ng), phi: phi });
+    }
+    return out;
+  }
+
+  // Detect symmetry of an FD eigenvector about midspan (for mode labelling).
+  function familyOf(phi){
+    var Ng = phi.length, sSym = 0, sAnti = 0, norm = 0;
+    for(var i = 0; i < Ng; i++){
+      var a = phi[i], b = phi[Ng - 1 - i];
+      sSym += Math.abs(a - b); sAnti += Math.abs(a + b); norm += Math.abs(a);
+    }
+    if(norm < 1e-12) return "";
+    return (sSym <= sAnti) ? "sym." : "antisym.";
+  }
+
+  // ---------- Physical models ----------
+  function pv(P, k){ return P[k].val; }
+
+  var MODELS = {
+    string: {
+      name: "Corde idéale",
+      desc: "Corde tendue sans raideur ni flèche, appuis simples. Référence : f_n = (n/2L)·√(T/μ). Rapport f_n/f₁ = n exactement (harmoniques purs).",
+      params: [
+        {key:"L",  label:"L",  unit:"m",    val:100, min:5,   max:500, step:1},
+        {key:"T",  label:"T",  unit:"N",    val:3e6, min:1e4, max:1e7, step:1e4},
+        {key:"mu", label:"μ", unit:"kg/m", val:50,  min:1,   max:300, step:1}
+      ],
+      options: [],
+      compute: function(P, O, N){
+        var L = pv(P,"L"), T = pv(P,"T"), mu = pv(P,"mu");
+        var c = Math.sqrt(T / mu), modes = [];
+        for(var n = 1; n <= N; n++){
+          modes.push({ n:n, label:"n="+n, family:"", f: (n/(2*L))*c, shape: shapeSine(n) });
+        }
+        return {
+          modes: modes,
+          derived: [
+            {lbl:"Célérité c = √(T/μ)", val: fmt(c), unit:"m/s"},
+            {lbl:"Masse totale", val: fmt(mu*L), unit:"kg"}
+          ],
+          note: "Modèle de corde vibrante à appuis simples. Valable quand la raideur en flexion et la flèche sont négligeables (câble très tendu et fin)."
+        };
+      }
+    },
+
+    beam: {
+      name: "Raideur en flexion EI",
+      desc: "Câble/poutre tendu avec raideur en flexion EI. La raideur augmente les fréquences et fait dériver f_n/f₁ au-dessus de n (dispersion).",
+      params: [
+        {key:"L",  label:"L",  unit:"m",       val:100, min:5,   max:500, step:1},
+        {key:"T",  label:"T",  unit:"N",       val:3e6, min:1e4, max:1e7, step:1e4},
+        {key:"mu", label:"μ", unit:"kg/m",    val:50,  min:1,   max:300, step:1},
+        {key:"EI", label:"EI", unit:"N·m²", val:2e6, min:0,   max:1e8, step:1e5}
+      ],
+      options: [
+        {key:"bc", label:"Conditions aux limites", def:"pinned",
+         choices:[{val:"pinned", label:"Appuis simples (exact)"},
+                  {val:"fixed",  label:"Encastré-encastré (approx.)"}]}
+      ],
+      compute: function(P, O, N){
+        var L = pv(P,"L"), T = pv(P,"T"), mu = pv(P,"mu"), EI = pv(P,"EI");
+        var c = Math.sqrt(T / mu), bc = O.bc, modes = [], derived = [], note;
+        if(bc === "pinned" || EI <= 0){
+          for(var n = 1; n <= N; n++){
+            var f = (n/(2*L))*c*Math.sqrt(1 + (n*n*Math.PI*Math.PI*EI)/(T*L*L));
+            modes.push({ n:n, label:"n="+n, family:"", f:f, shape: shapeSine(n) });
+          }
+          derived = [
+            {lbl:"Célérité √(T/μ)", val: fmt(c), unit:"m/s"},
+            {lbl:"EI/(T·L²)", val: fmt(EI/(T*L*L)), unit:"—"}
+          ];
+          note = "Poutre tendue à appuis simples : solution exacte f_n = (n/2L)√(T/μ)·√(1 + n²π²EI/(TL²)).";
+        } else {
+          var xi = L * Math.sqrt(T / EI);
+          for(var k = 1; k <= N; k++){
+            var corr = 1 + 2/xi + (4 + k*k*Math.PI*Math.PI/2) / (xi*xi);
+            modes.push({ n:k, label:"n="+k, family:"", f: (k/(2*L))*c*corr, shape: shapeSine(k) });
+          }
+          derived = [
+            {lbl:"ξ = L√(T/EI)", val: fmt(xi), unit:"—"},
+            {lbl:"Célérité √(T/μ)", val: fmt(c), unit:"m/s"},
+            {lbl:"Validité", val: (xi >= 20 ? "OK (ξ≥20)" : "ξ faible"), unit:""}
+          ];
+          note = "Encastré-encastré : formule approchée f_n = (n/2L)√(T/μ)·[1 + 2/ξ + (4 + n²π²/2)/ξ²], ξ = L√(T/EI). Précise pour ξ ≳ 20 (raideur = petite correction). Pour le cas raideur + flèche couplées, voir le modèle « Couplé (Irvine + EI) ».";
+        }
+        return { modes: modes, derived: derived, note: note };
+      }
+    },
+
+    irvine: {
+      name: "Flèche (Irvine)",
+      desc: "Câble horizontal avec flèche, théorie linéaire d'Irvine (sans raideur en flexion). La flèche couple géométrie et élasticité via le paramètre λ².",
+      params: [
+        {key:"L",  label:"L",  unit:"m",    val:100, min:5,   max:500, step:1},
+        {key:"H",  label:"H",  unit:"N",    val:3e6, min:1e4, max:1e7, step:1e4},
+        {key:"mu", label:"μ", unit:"kg/m", val:50,  min:1,   max:300, step:1},
+        {key:"EA", label:"EA", unit:"N",    val:2e9, min:1e7, max:5e10, step:1e8}
+      ],
+      options: [
+        {key:"plane", label:"Plan de vibration", def:"in",
+         choices:[{val:"in", label:"Dans le plan (vertical)"},
+                  {val:"out", label:"Hors plan (latéral)"}]}
+      ],
+      compute: function(P, O, N){
+        var L = pv(P,"L"), H = pv(P,"H"), mu = pv(P,"mu"), EA = pv(P,"EA");
+        var w = mu * G, d = w * L * L / (8 * H);
+        var Le = L * (1 + 8 * Math.pow(d/L, 2));
+        var lambda2 = Math.pow(w * L / H, 2) * (EA * L) / (H * Le);
+        var c = Math.sqrt(H / mu);
+        function fOf(Om){ return Om / (2 * Math.PI * L) * c; }
+        var modes = [], note;
+        if(O.plane === "out"){
+          for(var n = 1; n <= N; n++){
+            modes.push({ n:n, label:"n="+n, family:"hors-plan", f: fOf(n*Math.PI), shape: shapeSine(n) });
+          }
+          note = "Modes hors plan : non affectés par la flèche (spectre de corde, f_n/f₁ = n).";
+        } else {
+          var cand = [];
+          for(var k = 1; k <= N + 1; k++){ cand.push({ Om: 2*k*Math.PI, family:"antisym.", shape: shapeSine(2*k) }); }
+          findSymRoots(lambda2, N + 1).forEach(function(Om){ cand.push({ Om: Om, family:"sym.", shape: shapeIrvineSym(Om) }); });
+          cand.sort(function(a,b){ return a.Om - b.Om; });
+          for(var i = 0; i < N && i < cand.length; i++){
+            modes.push({ n:i+1, label:"n="+(i+1), family: cand[i].family, f: fOf(cand[i].Om), shape: cand[i].shape });
+          }
+          note = "Modes dans le plan : superposition des modes antisymétriques (Om = 2kπ, insensibles à λ²) et symétriques (équation transcendante d'Irvine). Croisement à λ² = 4π² ≈ 39,5. Raideur en flexion négligée.";
+        }
+        return {
+          modes: modes,
+          derived: [
+            {lbl:"Flèche d (mi-portée)", val: fmt(d), unit:"m"},
+            {lbl:"d/L", val: (d/L*100).toFixed(3), unit:"%"},
+            {lbl:"Paramètre λ² (Irvine)", val: fmt(lambda2), unit:"—"},
+            {lbl:"Le/L", val: (Le/L).toFixed(5), unit:"—"},
+            {lbl:"Célérité √(H/μ)", val: fmt(c), unit:"m/s"},
+            {lbl:"1er mode dans le plan", val: (lambda2 > 4*Math.PI*Math.PI ? "antisymétrique" : "symétrique"), unit:""}
+          ],
+          note: note + " (g = " + G + " m/s²)"
+        };
+      }
+    },
+
+    combined: {
+      name: "Couplé (Irvine + EI)",
+      heavy: true,
+      desc: "Cas réaliste d'un hauban : flèche ET raideur en flexion couplées, avec conditions aux limites appuis simples ou encastrées. Aucune formule fermée : résolution numérique par différences finies (méthode de Mehrabi & Tabatabai) et problème aux valeurs propres.",
+      params: [
+        {key:"L",  label:"L",  unit:"m",       val:100, min:5,   max:500, step:1},
+        {key:"H",  label:"H",  unit:"N",       val:3e6, min:1e4, max:1e7, step:1e4},
+        {key:"mu", label:"μ", unit:"kg/m",    val:50,  min:1,   max:300, step:1},
+        {key:"EI", label:"EI", unit:"N·m²", val:5e6, min:0,   max:1e8, step:1e5},
+        {key:"EA", label:"EA", unit:"N",       val:2e9, min:1e7, max:5e10, step:1e8}
+      ],
+      options: [
+        {key:"plane", label:"Plan de vibration", def:"in",
+         choices:[{val:"in", label:"Dans le plan (vertical)"},
+                  {val:"out", label:"Hors plan (latéral)"}]},
+        {key:"bc", label:"Conditions aux limites", def:"pinned",
+         choices:[{val:"pinned", label:"Appuis simples"},
+                  {val:"fixed",  label:"Encastré-encastré"}]}
+      ],
+      compute: function(P, O, N){
+        var Ng = 100;
+        var L = pv(P,"L"), H = pv(P,"H"), mu = pv(P,"mu"), EI = pv(P,"EI"), EA = pv(P,"EA");
+        var w = mu * G, d = w * L * L / (8 * H);
+        var Le = L * (1 + 8 * Math.pow(d/L, 2));
+        var lambda2 = Math.pow(w * L / H, 2) * (EA * L) / (H * Le);
+        var kc = (O.plane === "in") ? (EA / Le) * Math.pow(w / H, 2) : 0;
+        var raw = solveFD(L, H, mu, EI, kc, O.bc, Ng, N);
+        var modes = raw.map(function(r, i){
+          return { n:i+1, label:"n="+(i+1),
+                   family: (O.plane === "in") ? familyOf(r.phi) : "hors-plan",
+                   f: r.f, shape: r.shape };
+        });
+        var xi = (EI > 0) ? L * Math.sqrt(H / EI) : Infinity;
+        return {
+          modes: modes,
+          derived: [
+            {lbl:"Flèche d (mi-portée)", val: fmt(d), unit:"m"},
+            {lbl:"d/L", val: (d/L*100).toFixed(3), unit:"%"},
+            {lbl:"Paramètre λ² (Irvine)", val: fmt(lambda2), unit:"—"},
+            {lbl:"ξ = L√(H/EI)", val: (isFinite(xi) ? fmt(xi) : "∞"), unit:"—"},
+            {lbl:"Célérité √(H/μ)", val: fmt(Math.sqrt(H/mu)), unit:"m/s"},
+            {lbl:"Discrétisation", val: Ng, unit:"points"}
+          ],
+          note: "Modèle couplé flèche + raideur, résolu par différences finies (méthode de Mehrabi &amp; Tabatabai 1998) : "
+            + "<strong>EI·v'''' − H·v'' + (EA/Le)(w/H)²·∫v dx = μ·ω²·v</strong>, discrétisée sur " + Ng + " points, "
+            + "valeurs propres par rotations de Jacobi. Les modes hors plan et antisymétriques dans le plan ne sont pas affectés par le couplage de flèche (∫v dx = 0). "
+            + "<strong>Hypothèses :</strong> théorie linéaire, câble à faible flèche (profil parabolique), section et masse uniformes, sans amortissement ni effet aérodynamique. "
+            + "Type de mode (sym./antisym.) détecté automatiquement. Précision numérique ~0,1 % sur les premiers modes ; les modes élevés (n proche de 10) sont légèrement sous-estimés (résolution finie). (g = " + G + " m/s²)"
+        };
+      }
+    },
+
+    custom: {
+      name: "Formule personnalisée",
+      desc: "Saisis ta propre formule f(n, ...). L'outil détecte les variables et crée les curseurs. Aucune conversion d'unités : la cohérence est à ta charge.",
+      params: null,
+      options: [],
+      compute: function(P, O, N){
+        if(!state.evaluator) return { modes: [], derived: [], note: "" };
+        var base = {};
+        state.vars.forEach(function(v){ base[v] = P[v].val; });
+        var modes = [];
+        for(var n = 1; n <= N; n++){
+          base.n = n;
+          modes.push({ n:n, label:"n="+n, family:"", f: state.evaluator(base), shape: shapeSine(n) });
+        }
+        return {
+          modes: modes, derived: [],
+          note: "Formes modales tracées en sinusoïdes sin(nπx/L) par défaut. Les fréquences proviennent de ta formule."
+        };
+      }
+    }
+  };
+  var MODEL_ORDER = ["string", "beam", "irvine", "combined", "custom"];
+
+  // ---------- State ----------
+  var state = { modelId: "string", params: {}, options: {}, vars: [], evaluator: null };
+
+  // ---------- Parameter UI ----------
+  function makeParam(spec){
+    return { key: spec.key, label: spec.label, unit: spec.unit,
+             val: spec.val, min: spec.min, max: spec.max, step: spec.step };
+  }
+
+  function buildParamsUI(order){
+    var host = g("params");
+    host.innerHTML = "";
+    if(order.length === 0){
+      host.innerHTML = '<div style="font-size:13px;color:var(--text-muted);">Aucun paramètre (hors n).</div>';
+      return;
+    }
+    order.forEach(function(key){
+      var p = state.params[key];
+      var row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML =
+        '<span class="name">' + p.label + (p.unit ? ' <span class="u">' + p.unit + '</span>' : '') + '</span>'
+      + '<div class="ctl">'
+      +   '<input type="range" data-var="' + key + '" data-role="slider" min="' + p.min + '" max="' + p.max + '" step="' + p.step + '" value="' + p.val + '">'
+      +   '<input class="num" type="number" data-var="' + key + '" data-role="num" step="' + p.step + '" value="' + p.val + '">'
+      + '</div>'
+      + '<div class="rng-cfg">min<input type="number" data-var="' + key + '" data-role="min" value="' + p.min + '">'
+      +   'max<input type="number" data-var="' + key + '" data-role="max" value="' + p.max + '"></div>';
+      host.appendChild(row);
+    });
+
+    host.querySelectorAll("input").forEach(function(inp){
+      inp.addEventListener("input", function(){
+        var key = inp.getAttribute("data-var"), role = inp.getAttribute("data-role");
+        var p = state.params[key], v = parseFloat(inp.value);
+        if(isNaN(v)) return;
+        if(role === "slider" || role === "num"){
+          p.val = v;
+          if(v > p.max) p.max = v;   // auto-expand so the slider never contradicts the value
+          if(v < p.min) p.min = v;
+        } else if(role === "min"){ p.min = v; }
+        else if(role === "max"){ p.max = v; }
+        syncRow(key);
+        requestRefresh();
+      });
+    });
+  }
+
+  function syncRow(key){
+    var p = state.params[key], host = g("params");
+    var slider = host.querySelector('input[data-role="slider"][data-var="' + key + '"]');
+    var num = host.querySelector('input[data-role="num"][data-var="' + key + '"]');
+    var minI = host.querySelector('input[data-role="min"][data-var="' + key + '"]');
+    var maxI = host.querySelector('input[data-role="max"][data-var="' + key + '"]');
+    if(slider){ slider.min = p.min; slider.max = p.max; slider.value = p.val; }
+    if(num && document.activeElement !== num){ num.value = p.val; }
+    if(minI && document.activeElement !== minI){ minI.value = p.min; }
+    if(maxI && document.activeElement !== maxI){ maxI.value = p.max; }
+  }
+
+  // ---------- Options UI ----------
+  function buildOptionsUI(model){
+    var host = g("opts");
+    host.innerHTML = "";
+    state.options = {};
+    (model.options || []).forEach(function(opt){
+      state.options[opt.key] = opt.def;
+      var wrap = document.createElement("div");
+      wrap.className = "opt";
+      var sel = '<label>' + opt.label + '</label><select data-opt="' + opt.key + '">';
+      opt.choices.forEach(function(c){
+        sel += '<option value="' + c.val + '"' + (c.val === opt.def ? ' selected' : '') + '>' + c.label + '</option>';
+      });
+      sel += '</select>';
+      wrap.innerHTML = sel;
+      host.appendChild(wrap);
+    });
+    host.querySelectorAll("select").forEach(function(s){
+      s.addEventListener("change", function(){
+        state.options[s.getAttribute("data-opt")] = s.value;
+        refresh();
+      });
+    });
+  }
+
+  // ---------- Custom formula ----------
+  function applyCustomFormula(){
+    var expr = g("formula").value.trim(), err = g("err");
+    try {
+      var vars = extractVars(expr);
+      var ev = compile(expr, vars.concat(["n"]));
+      var testScope = { n: 1 };
+      vars.forEach(function(v){ testScope[v] = varDefault(v).val; });
+      if(!isFinite(ev(testScope))) throw new Error("La formule ne renvoie pas un nombre fini avec les valeurs par défaut.");
+      state.vars = vars; state.evaluator = ev;
+      err.className = "err";
+      state.params = {};
+      vars.forEach(function(name){
+        var d = varDefault(name);
+        state.params[name] = { key:name, label:name, unit:d.unit, val:d.val, min:d.min, max:d.max, step:d.step };
+      });
+      buildParamsUI(vars);
+      refresh();
+    } catch(e){
+      err.textContent = "Erreur : " + e.message;
+      err.className = "err show";
+    }
+  }
+
+  // ---------- Model switching ----------
+  function setModel(id){
+    state.modelId = id;
+    var m = MODELS[id];
+    g("modelDesc").textContent = m.desc;
+    g("formulaPanel").style.display = (id === "custom") ? "block" : "none";
+    buildOptionsUI(m);
+    if(id === "custom"){
+      applyCustomFormula();
+    } else {
+      state.params = {};
+      var order = m.params.map(function(s){ return s.key; });
+      m.params.forEach(function(s){ state.params[s.key] = makeParam(s); });
+      buildParamsUI(order);
+      refresh();
+    }
+    g("models").querySelectorAll("button").forEach(function(b){
+      b.classList.toggle("active", b.getAttribute("data-model") === id);
+    });
+  }
+
+  // ---------- Compute + render ----------
+  // Heavy models (finite-difference eigensolve) are debounced so slider drags stay smooth.
+  var refreshTimer = null;
+  function requestRefresh(){
+    if(MODELS[state.modelId].heavy){
+      if(refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(refresh, 60);
+    } else {
+      refresh();
+    }
+  }
+
+  function refresh(){
+    var m = MODELS[state.modelId];
+    var N = parseInt(g("Nmodes").value, 10);
+    g("Nmodes_out").textContent = N;
+
+    var res = m.compute(state.params, state.options, N);
+    var modes = res.modes;
+    if(!modes || modes.length === 0){ return; }
+
+    var f1 = modes[0].f;
+    g("f1_out").textContent = fmt(f1);
+    g("ratio_out").textContent = (modes.length >= 2 && f1 !== 0) ? (modes[1].f / f1).toFixed(3) : "—";
+
+    var dh = "";
+    (res.derived || []).forEach(function(d){
+      dh += '<div class="d"><span class="dl">' + d.lbl + '</span><span class="dv">' + d.val + (d.unit ? ' ' + d.unit : '') + '</span></div>';
+    });
+    g("derived").innerHTML = dh || '<div style="font-size:13px;color:var(--text-muted);">—</div>';
+
+    var hasFam = modes.some(function(md){ return md.family; });
+    var html = '<tr><th>Mode</th>' + (hasFam ? '<th>Type</th>' : '') + '<th>Fréquence (Hz)</th><th>Période (s)</th><th>f_n / f₁</th></tr>';
+    for(var i = 0; i < modes.length; i++){
+      var f = modes[i].f;
+      html += '<tr><td><span class="dot" style="background:' + palette[i % palette.length] + '"></span>' + modes[i].n + '</td>'
+        + (hasFam ? '<td class="fam">' + (modes[i].family || "—") + '</td>' : '')
+        + '<td>' + fmt(f) + '</td>'
+        + '<td>' + (f ? fmt(1/f) : "—") + '</td>'
+        + '<td>' + (f1 ? (f/f1).toFixed(3) : "—") + '</td></tr>';
+    }
+    g("tbl").innerHTML = html;
+
+    g("note").innerHTML = res.note || "";
+    draw(modes);
+  }
+
+  // ---------- Plot ----------
+  function draw(modes){
+    var W = 640, H = 260, padX = 34, padY = 30;
+    var x0 = padX, x1 = W - padX, midY = H / 2, amp = (H / 2) - padY;
+    var parts = [];
+    parts.push('<line x1="' + x0 + '" y1="' + midY + '" x2="' + x1 + '" y2="' + midY + '" stroke="#999" stroke-width="1"/>');
+    [x0, x1].forEach(function(x){
+      parts.push('<polygon points="' + x + ',' + (midY-8) + ' ' + (x-6) + ',' + (midY+8) + ' ' + (x+6) + ',' + (midY+8) + '" fill="#888"/>');
+    });
+    var steps = 200;
+    modes.forEach(function(md, idx){
+      var ys = [], maxAbs = 1e-9;
+      for(var i = 0; i <= steps; i++){
+        var y = md.shape(i / steps);
+        ys.push(y);
+        if(Math.abs(y) > maxAbs) maxAbs = Math.abs(y);
+      }
+      var pts = [];
+      for(var j = 0; j <= steps; j++){
+        var t = j / steps, x = x0 + t * (x1 - x0);
+        var yy = midY - amp * 0.85 * (ys[j] / maxAbs);
+        pts.push(x.toFixed(1) + ',' + yy.toFixed(1));
+      }
+      parts.push('<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + palette[idx % palette.length] + '" stroke-width="2"/>');
+    });
+    g("svg").innerHTML = parts.join('');
+  }
+
+  // ---------- Wiring ----------
+  MODEL_ORDER.forEach(function(id){
+    var b = document.createElement("button");
+    b.textContent = MODELS[id].name;
+    b.setAttribute("data-model", id);
+    b.addEventListener("click", function(){ setModel(id); });
+    g("models").appendChild(b);
+  });
+  g("Nmodes").addEventListener("input", requestRefresh);
+  g("apply").addEventListener("click", applyCustomFormula);
+  document.querySelectorAll(".presets button").forEach(function(b){
+    b.addEventListener("click", function(){ g("formula").value = b.getAttribute("data-f"); applyCustomFormula(); });
+  });
+
+  setModel("string");
+})();
+</script>
+</body>
+</html>
