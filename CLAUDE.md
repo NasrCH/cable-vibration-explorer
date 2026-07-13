@@ -15,7 +15,7 @@ the bottom `<script>`. UI strings are French; code and comments are English.
 Repo layout: `index.html` (the app), `README.md` (physics + deploy docs, uses GitHub
 LaTeX math), `.nojekyll`, `.github/workflows/deploy.yml` (Pages deploy).
 
-## The five models (`MODELS` registry in the `<script>`)
+## The six models (`MODELS` registry in the `<script>`)
 
 1. **`string`** — ideal taut string: `f_n = (n/2L)√(T/μ)`.
 2. **`beam`** — tensioned member with bending stiffness EI. Option `bc`: `pinned` (exact
@@ -27,10 +27,18 @@ LaTeX math), `.nojekyll`, `.github/workflows/deploy.yml` (Pages deploy).
 4. **`combined`** — sag AND bending together (the realistic stay cable). No closed form:
    finite-difference discretization of the in-plane PDE solved as a symmetric eigenvalue
    problem. Options `plane` and `bc`. Marked `heavy: true` → its refresh is debounced.
-5. **`custom`** — the dependency-free formula sandbox; params auto-detected from the formula.
+5. **`static`** — `staticShape: true`. NOT a frequency model: it computes the static
+   equilibrium *profile* of an inclined cable under self-weight (catenary solution, eqs
+   1.4-1.6 of the source doc): `Y(X)/l = (1/τ)[cosh C₁ − cosh(C₁ − τX/l)]`,
+   `τ = μg·l/H`, `l = L·cos α`. `compute` returns `{staticShape:true, profile, derived,
+   note}`; `refresh()` branches on `staticShape` to hide the frequency cards/table/mode
+   slider and call `drawProfile()` instead of `draw()`. Verified against limits (τ→0 →
+   straight chord; α=0 → parabola sag τl/8; Y(l)=l·tan α exactly).
+6. **`custom`** — the dependency-free formula sandbox; params auto-detected from the formula.
 
-Every model's `compute(P, O, N)` returns `{modes, derived, note}`; `modes` are
+Every frequency model's `compute(P, O, N)` returns `{modes, derived, note}`; `modes` are
 `{n, label, family, f, shape}` and `shape(t)` maps `t = x/L ∈ [0,1]` to displacement.
+A `staticShape` model returns a `profile` (`{pts, l, tanA, maxSag}`) instead of `modes`.
 
 ## Numerical core (most fragile part — verify before trusting changes)
 
@@ -66,5 +74,6 @@ Every model's `compute(P, O, N)` returns `{modes, derived, note}`; `modes` are
 
 - New math function for the custom model: add to `SCOPE_FUNCS`.
 - New physical model: add to `MODELS` + `MODEL_ORDER`; implement `compute(P, O, N)`, plus
-  `params` and any `options` specs. Set `heavy: true` if it does an eigensolve.
+  `params` and any `options` specs. Set `heavy: true` if it does an eigensolve. Set
+  `staticShape: true` if it draws a profile rather than frequencies (see `static`).
 - Keep UI text French, code/comments English.

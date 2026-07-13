@@ -142,7 +142,7 @@
 <body>
 <div class="container">
   <h1>Vibrations d'un câble</h1>
-  <p class="subtitle">Fréquences propres et formes modales : corde idéale, raideur en flexion, câble avec flèche (Irvine), modèle couplé flèche + raideur (différences finies), ou ta propre formule.</p>
+  <p class="subtitle">Fréquences propres et formes modales : corde idéale, raideur en flexion, câble avec flèche (Irvine), modèle couplé flèche + raideur (différences finies), allure statique d'un câble incliné, ou ta propre formule.</p>
 
   <div class="segmented" id="models"></div>
 
@@ -170,7 +170,7 @@
   <h2>Paramètres</h2>
   <div id="params"></div>
 
-  <div class="row" style="margin-top:16px;">
+  <div class="row" style="margin-top:16px;" id="modesRow">
     <span class="name">modes</span>
     <div class="ctl">
       <input type="range" id="Nmodes" min="1" max="10" value="4" step="1">
@@ -178,8 +178,8 @@
     </div>
   </div>
 
-  <h2>Résultats</h2>
-  <div class="cards">
+  <h2 id="resultsTitle">Résultats</h2>
+  <div class="cards" id="cards">
     <div class="card">
       <div class="lbl">Fréquence fondamentale f&#8321;</div>
       <div class="val" id="f1_out">&mdash;</div>
@@ -197,7 +197,7 @@
 
   <table id="tbl"></table>
 
-  <h2>Formes modales</h2>
+  <h2 id="shapesTitle">Formes modales</h2>
   <div class="plot-wrap">
     <svg id="svg" viewBox="0 0 640 260" xmlns="http://www.w3.org/2000/svg"></svg>
   </div>
@@ -597,6 +597,62 @@
       }
     },
 
+    static: {
+      name: "Allure statique (incliné)",
+      staticShape: true,
+      desc: "Forme d'équilibre statique d'un câble incliné sous son poids propre (solution caténaire). Ne calcule pas de fréquences : trace l'allure du câble entre ses deux ancrages.",
+      params: [
+        {key:"L",     label:"L",  unit:"m (corde)", val:120, min:5,   max:500, step:1},
+        {key:"alpha", label:"α", unit:"° (inclinaison)", val:30, min:0, max:75, step:1},
+        {key:"mu",    label:"μ", unit:"kg/m",     val:50,  min:1,   max:300, step:1},
+        {key:"H",     label:"H",  unit:"N",         val:3e6, min:1e4, max:1e7, step:1e4}
+      ],
+      options: [],
+      compute: function(P, O, N){
+        // Static equilibrium of an inclined cable under self-weight (catenary),
+        // eqs (1.4)-(1.6): Y(X)/l = (1/tau)[cosh C1 - cosh(C1 - tau X/l)],
+        // tau = mu*g*l/H, C = (tau e^tau/(e^tau-1)) tan a, C1 = ln(C + sqrt(C^2+e^tau)).
+        // l = L cos a is the horizontal span; L is the chord length between anchorages.
+        var L = pv(P,"L"), a = pv(P,"alpha") * Math.PI / 180, mu = pv(P,"mu"), H = pv(P,"H");
+        var l = L * Math.cos(a), w = mu * G, tanA = Math.tan(a);
+        var tau = w * l / H;
+        var eT = Math.exp(tau);
+        var C = (tau * eT / (eT - 1)) * tanA;
+        var C1 = Math.log(C + Math.sqrt(C * C + eT));
+        function Yv(X){ return (l / tau) * (Math.cosh(C1) - Math.cosh(C1 - tau * X / l)); }
+        // Sample the profile; also track the max vertical sag below the chord.
+        var steps = 240, pts = [], maxSag = 0, xSag = 0;
+        for(var i = 0; i <= steps; i++){
+          var X = l * i / steps, y = Yv(X), sag = y - X * tanA;
+          pts.push({ X: X, Y: y });
+          if(sag > maxSag){ maxSag = sag; xSag = X; }
+        }
+        var arc = (l / tau) * (Math.sinh(C1) - Math.sinh(C1 - tau)); // cable length
+        var Tmax = H / Math.cos(a); // along-chord equivalent thrust (T = H/cos a)
+        return {
+          staticShape: true,
+          profile: { pts: pts, l: l, tanA: tanA, maxSag: maxSag },
+          modes: [{ n:1, label:"", family:"", f: 0, shape: function(){ return 0; } }], // placeholder so refresh() proceeds
+          derived: [
+            {lbl:"τ = μg·l/H", val: fmt(tau), unit:"—"},
+            {lbl:"Portée horizontale l = L·cos α", val: fmt(l), unit:"m"},
+            {lbl:"Flèche verticale max", val: fmt(maxSag), unit:"m"},
+            {lbl:"Position flèche max", val: (xSag / l * 100).toFixed(1), unit:"% portée"},
+            {lbl:"Longueur du câble (arc)", val: fmt(arc), unit:"m"},
+            {lbl:"Allongement arc/corde", val: ((arc / L - 1) * 100).toFixed(3), unit:"%"},
+            {lbl:"Poussée équivalente T = H/cos α", val: fmt(Tmax), unit:"N"},
+            {lbl:"Dénivelé des appuis", val: fmt(l * tanA), unit:"m"}
+          ],
+          note: "Allure statique d'un câble incliné sous poids propre (solution caténaire, éq. 1.4-1.6) : "
+            + "<strong>Y(X)/l = (1/τ)·[cosh C₁ − cosh(C₁ − τX/l)]</strong>, τ = μg·l/H, "
+            + "C₁ = ln(C + √(C²+e^τ)), C = (τe^τ/(e^τ−1))·tan α. "
+            + "L est la longueur de corde (entre ancrages), l = L·cos α la portée horizontale, α l'inclinaison. "
+            + "<strong>Le tracé conserve l'angle réel de la corde ; la flèche est exagérée pour la lisibilité (facteur indiqué)</strong> — la valeur réelle est en « Flèche verticale max ». "
+            + "Hypothèses : profil d'équilibre sous poids propre uniforme, câble inextensible en géométrie, sans charge ponctuelle. (g = " + G + " m/s²)"
+        };
+      }
+    },
+
     custom: {
       name: "Formule personnalisée",
       desc: "Saisis ta propre formule f(n, ...). L'outil détecte les variables et crée les curseurs. Aucune conversion d'unités : la cohérence est à ta charge.",
@@ -618,7 +674,7 @@
       }
     }
   };
-  var MODEL_ORDER = ["string", "beam", "irvine", "combined", "custom"];
+  var MODEL_ORDER = ["string", "beam", "irvine", "combined", "static", "custom"];
 
   // ---------- State ----------
   var state = { modelId: "string", params: {}, options: {}, vars: [], evaluator: null };
@@ -735,6 +791,14 @@
     var m = MODELS[id];
     g("modelDesc").textContent = m.desc;
     g("formulaPanel").style.display = (id === "custom") ? "block" : "none";
+    // Static-shape models produce a profile, not frequencies: hide the mode count,
+    // the frequency cards and the modes table; relabel the plot.
+    var isStatic = !!m.staticShape;
+    g("modesRow").style.display = isStatic ? "none" : "";
+    g("resultsTitle").style.display = isStatic ? "none" : "";
+    g("cards").style.display = isStatic ? "none" : "";
+    g("tbl").style.display = isStatic ? "none" : "";
+    g("shapesTitle").textContent = isStatic ? "Allure du câble" : "Formes modales";
     buildOptionsUI(m);
     if(id === "custom"){
       applyCustomFormula();
@@ -768,18 +832,24 @@
     g("Nmodes_out").textContent = N;
 
     var res = m.compute(state.params, state.options, N);
+
+    // Derived-quantities panel and note are shared by every model.
+    var dh = "";
+    (res.derived || []).forEach(function(d){
+      dh += '<div class="d"><span class="dl">' + d.lbl + '</span><span class="dv">' + d.val + (d.unit ? ' ' + d.unit : '') + '</span></div>';
+    });
+    g("derived").innerHTML = dh || '<div style="font-size:13px;color:var(--text-muted);">—</div>';
+    g("note").innerHTML = res.note || "";
+
+    // Static-shape branch: draw the equilibrium profile, skip the frequency UI.
+    if(res.staticShape){ drawProfile(res.profile); return; }
+
     var modes = res.modes;
     if(!modes || modes.length === 0){ return; }
 
     var f1 = modes[0].f;
     g("f1_out").textContent = fmt(f1);
     g("ratio_out").textContent = (modes.length >= 2 && f1 !== 0) ? (modes[1].f / f1).toFixed(3) : "—";
-
-    var dh = "";
-    (res.derived || []).forEach(function(d){
-      dh += '<div class="d"><span class="dl">' + d.lbl + '</span><span class="dv">' + d.val + (d.unit ? ' ' + d.unit : '') + '</span></div>';
-    });
-    g("derived").innerHTML = dh || '<div style="font-size:13px;color:var(--text-muted);">—</div>';
 
     var hasFam = modes.some(function(md){ return md.family; });
     var html = '<tr><th>Mode</th>' + (hasFam ? '<th>Type</th>' : '') + '<th>Fréquence (Hz)</th><th>Période (s)</th><th>f_n / f₁</th></tr>';
@@ -792,12 +862,52 @@
         + '<td>' + (f1 ? (f/f1).toFixed(3) : "—") + '</td></tr>';
     }
     g("tbl").innerHTML = html;
-
-    g("note").innerHTML = res.note || "";
     draw(modes);
   }
 
-  // ---------- Plot ----------
+  // ---------- Plot: static profile of an inclined cable ----------
+  // Chord angle is drawn true (uniform scale); the sag below the chord is
+  // exaggerated by a labelled factor so it stays visible at real span/sag ratios.
+  function drawProfile(prof){
+    var W = 640, H = 260, pad = 34;
+    var l = prof.l, tanA = prof.tanA, pts = prof.pts, maxSag = prof.maxSag;
+    // Exaggeration factor: bring the max sag to ~18% of the span, floor 1, cap 500.
+    var K = 1;
+    if(maxSag > 1e-9){ K = Math.min(500, Math.max(1, 0.18 * l / maxSag)); }
+    // Displayed vertical (down-positive): chord + exaggerated sag below it.
+    function ydisp(p){ var chord = p.X * tanA; return chord + K * (p.Y - chord); }
+    var yMin = 0, yMax = 0;
+    pts.forEach(function(p){ var y = ydisp(p); if(y < yMin) yMin = y; if(y > yMax) yMax = y; });
+    var spanY = Math.max(yMax - yMin, 1e-6);
+    var scale = Math.min((W - 2 * pad) / l, (H - 2 * pad) / spanY);
+    var offX = (W - l * scale) / 2;
+    var offY = (H - spanY * scale) / 2;
+    function sx(X){ return offX + X * scale; }
+    function sy(y){ return offY + (y - yMin) * scale; }
+
+    var parts = [];
+    // Chord (dashed) between the two anchorages.
+    parts.push('<line x1="' + sx(0).toFixed(1) + '" y1="' + sy(ydisp(pts[0])).toFixed(1)
+      + '" x2="' + sx(l).toFixed(1) + '" y2="' + sy(ydisp(pts[pts.length-1])).toFixed(1)
+      + '" stroke="#999" stroke-width="1" stroke-dasharray="5 4"/>');
+    // Cable profile.
+    var poly = pts.map(function(p){ return sx(p.X).toFixed(1) + ',' + sy(ydisp(p)).toFixed(1); });
+    parts.push('<polyline points="' + poly.join(' ') + '" fill="none" stroke="' + palette[0] + '" stroke-width="2.5"/>');
+    // Anchorage markers A and B.
+    [{X:0, lab:"A"}, {X:l, lab:"B"}].forEach(function(a, i){
+      var p = (i === 0) ? pts[0] : pts[pts.length-1];
+      var cx = sx(a.X), cy = sy(ydisp(p));
+      parts.push('<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="4" fill="#888"/>');
+      parts.push('<text x="' + cx.toFixed(1) + '" y="' + (cy + (i === 0 ? -10 : 18)).toFixed(1)
+        + '" font-size="12" fill="#888" text-anchor="middle" font-family="sans-serif">' + a.lab + '</text>');
+    });
+    // Exaggeration label.
+    var kLabel = (K > 1.05) ? ("flèche ×" + (K >= 10 ? Math.round(K) : K.toFixed(1)) + " (exagérée)") : "échelle réelle";
+    parts.push('<text x="' + (W - pad) + '" y="18" font-size="11" fill="#888" text-anchor="end" font-family="sans-serif">' + kLabel + '</text>');
+    g("svg").innerHTML = parts.join('');
+  }
+
+  // ---------- Plot: vibration mode shapes ----------
   function draw(modes){
     var W = 640, H = 260, padX = 34, padY = 30;
     var x0 = padX, x1 = W - padX, midY = H / 2, amp = (H / 2) - padY;

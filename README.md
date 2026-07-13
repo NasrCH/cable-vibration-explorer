@@ -15,6 +15,7 @@ The user interface is in French. Live version once deployed:
 | **Bending stiffness EI** | tensioned member with flexural rigidity | pinned (exact) and clamped (approx.) ends |
 | **Sag (Irvine)** | horizontal cable with sag, linear theory | in-plane (symmetric + antisymmetric) and out-of-plane |
 | **Coupled (Irvine + EI)** | sag **and** bending together | finite-difference eigensolve; the realistic stay-cable case |
+| **Static shape (inclined)** | equilibrium profile of an inclined cable under self-weight | catenary solution; plots the shape, not frequencies |
 | **Custom formula** | your own `f(n, ...)` | auto-detects variables, builds sliders |
 
 ### 1. Ideal string
@@ -60,6 +61,22 @@ Out-of-plane and antisymmetric in-plane modes drop the sag coupling term ($\int 
 **Assumptions:** linear theory, shallow (parabolic) profile, uniform section and mass,
 no damping, no aerodynamic effects. Numerical accuracy is ~0.1% on the lowest modes;
 higher modes (n near 10) are slightly underestimated by the finite grid.
+
+### 5. Static shape of an inclined cable
+
+The equilibrium profile of an inclined cable under its own weight (catenary-based
+solution). With chord length $L$, inclination $\alpha$, horizontal span $l = L\cos\alpha$,
+and $\tau = \mu g\,l/H$:
+
+$$\frac{Y(X)}{l} = \frac{1}{\tau}\left[\cosh C_1 - \cosh\!\left(C_1 - \tau\frac{X}{l}\right)\right],\qquad
+C_1 = \ln\!\left(C + \sqrt{C^2 + e^{\tau}}\right),\quad
+C = \frac{\tau e^{\tau}}{e^{\tau}-1}\tan\alpha$$
+
+This model plots the cable shape between its two anchorages (it does not compute
+frequencies). The chord is drawn at its true angle; the sag below the chord is
+exaggerated by a labelled factor for legibility, with the real sag reported in the
+derived-quantities panel. Verified against limits: $\tau\to 0$ gives a straight chord,
+$\alpha = 0$ reduces to the parabolic sag $\tau l/8$, and $Y(l) = l\tan\alpha$ exactly.
 
 ## Validation
 
