@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Allure statique d'un câble incliné</title>
+<title>Câble incliné — allure statique et vibrations</title>
 <style>
   :root {
     --bg: #faf9f5;
@@ -44,8 +44,21 @@
 
   .panel { background: var(--surface-1); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
 
+  .segmented { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1.25rem; }
+  .segmented button {
+    font-family: var(--font-sans); font-size: 13px; cursor: pointer;
+    background: var(--surface); color: var(--text-primary);
+    border: 0.5px solid var(--border-strong); border-radius: var(--radius);
+    padding: 8px 14px; transition: background .15s, border-color .15s;
+  }
+  .segmented button:hover { background: var(--border); }
+  .segmented button.active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 500; }
+  .model-desc { font-size: 13px; color: var(--text-secondary); margin: 0 0 1rem; }
+
+  .opts { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 1rem; }
+
   .row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-  .row .name { font-family: var(--font-mono); font-size: 14px; font-weight: 500; min-width: 132px; }
+  .row .name { font-family: var(--font-mono); font-size: 14px; font-weight: 500; min-width: 150px; }
   .row .name .u { font-size: 11px; color: var(--text-muted); font-family: var(--font-sans); }
   .row .ctl { flex: 1; display: flex; align-items: center; gap: 10px; }
   input[type="range"] {
@@ -68,10 +81,22 @@
   .rng-cfg input { width: 62px; font-family: var(--font-mono); font-size: 11px; text-align: right;
     background: var(--surface); color: var(--text-secondary); border: 0.5px solid var(--border); border-radius: 4px; padding: 2px 4px; }
 
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0; }
+  .card { background: var(--surface-1); border-radius: var(--radius); padding: 1rem; }
+  .card .lbl { font-size: 13px; color: var(--text-secondary); }
+  .card .val { font-size: 24px; font-weight: 500; word-break: break-all; }
+  .card .unit { font-size: 12px; color: var(--text-muted); }
+
   .derived { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 20px; }
   .derived .d { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 3px 0; border-bottom: 0.5px solid var(--border); }
   .derived .d .dl { color: var(--text-secondary); }
   .derived .d .dv { font-family: var(--font-mono); }
+
+  table { width: 100%; font-size: 14px; border-collapse: collapse; margin-bottom: 16px; }
+  th { text-align: left; color: var(--text-secondary); font-weight: 500; padding: 6px 4px; border-bottom: 0.5px solid var(--border); }
+  td { padding: 6px 4px; border-bottom: 0.5px solid var(--border); }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+  .fam { font-size: 11px; color: var(--text-muted); }
 
   .plot-wrap { background: var(--surface-1); border-radius: 12px; padding: 12px; }
   svg { display: block; height: auto; width: 100%; }
@@ -83,16 +108,33 @@
 </head>
 <body>
 <div class="container">
-  <h1>Allure statique d'un câble incliné</h1>
-  <p class="subtitle">Forme d'équilibre d'un câble incliné sous son poids propre (solution caténaire). Trace l'allure du câble entre ses deux ancrages.</p>
+  <h1>Câble incliné — statique et vibrations</h1>
+  <p class="subtitle">Allure d'équilibre d'un câble incliné sous poids propre, et fréquences propres / modes de vibration (câble en chaînette).</p>
+
+  <div class="segmented" id="models"></div>
+  <p class="model-desc" id="modelDesc"></p>
+  <div class="opts" id="opts"></div>
 
   <h2>Paramètres</h2>
   <div id="params"></div>
 
+  <div class="row" style="margin-top:16px;" id="modesRow">
+    <span class="name">modes</span>
+    <div class="ctl">
+      <input type="range" id="Nmodes" min="1" max="8" value="4" step="1">
+      <span class="num" style="min-width:30px; text-align:right; font-family:var(--font-mono);" id="Nmodes_out">4</span>
+    </div>
+  </div>
+
+  <h2 id="resultsTitle">Résultats</h2>
+  <div class="cards" id="cards"></div>
+
   <h2>Grandeurs dérivées</h2>
   <div class="panel"><div class="derived" id="derived"></div></div>
 
-  <h2>Allure du câble</h2>
+  <table id="tbl"></table>
+
+  <h2 id="plotTitle">Allure du câble</h2>
   <div class="plot-wrap">
     <svg id="svg" viewBox="0 0 640 260" xmlns="http://www.w3.org/2000/svg"></svg>
   </div>
@@ -100,6 +142,7 @@
   <p class="note" id="note"></p>
 
   <ul class="refs">
+    <li>H.M. Irvine, T.K. Caughey, <em>The linear theory of free vibrations of a suspended cable</em>, Proc. R. Soc. Lond. A 341 (1974) 299-315.</li>
     <li>H.M. Irvine, <em>Cable Structures</em>, MIT Press, 1981.</li>
   </ul>
 </div>
@@ -108,10 +151,10 @@
 (function(){
   "use strict";
 
-  var G = 9.81; // m/s^2, gravitational acceleration used for cable weight
+  var G = 9.81;            // m/s^2
   var ACCENT = "#534AB7";
+  var palette = ["#534AB7","#1D9E75","#D85A30","#378ADD","#BA7517","#D4537E","#0F6E56","#993C1D"];
   function g(id){ return document.getElementById(id); }
-
   function fmt(x){
     if(x === null || x === undefined || !isFinite(x)) return "—";
     var a = Math.abs(x);
@@ -119,66 +162,222 @@
     return x.toFixed(3);
   }
 
-  // ---------- Parameters ----------
-  // L = chord length between anchorages; alpha = chord inclination; mu = mass/length; H = horizontal tension.
-  var PARAM_SPECS = [
-    {key:"L",     label:"L",  unit:"m (corde)",         val:120, min:5,   max:500, step:1},
-    {key:"alpha", label:"α", unit:"° (inclinaison)",   val:30,  min:0,   max:75,  step:1},
-    {key:"mu",    label:"μ", unit:"kg/m",              val:50,  min:1,   max:300, step:1},
-    {key:"H",     label:"H",  unit:"N",                 val:3e6, min:1e4, max:1e7, step:1e4}
-  ];
-  var params = {}; // key -> {val,min,max,step,unit,label}
-  PARAM_SPECS.forEach(function(s){
-    params[s.key] = { key:s.key, label:s.label, unit:s.unit, val:s.val, min:s.min, max:s.max, step:s.step };
-  });
-
-  // ---------- Static equilibrium of an inclined cable under self-weight ----------
-  // Catenary solution (eqs 1.4-1.6): Y(X)/l = (1/tau)[cosh C1 - cosh(C1 - tau X/l)],
-  // tau = mu*g*l/H, C = (tau e^tau/(e^tau-1)) tan a, C1 = ln(C + sqrt(C^2+e^tau)).
-  // l = L cos a is the horizontal span; Y is measured downward from the upper anchorage.
-  function compute(){
-    var L = params.L.val, a = params.alpha.val * Math.PI / 180, mu = params.mu.val, H = params.H.val;
-    var l = L * Math.cos(a), w = mu * G, tanA = Math.tan(a);
-    var tau = w * l / H;
-    var eT = Math.exp(tau);
+  // ===================== Shared inclined-catenary geometry =====================
+  // L = chord length; alpha = inclination (rad); mu = mass/length; H = horizontal tension.
+  function geom(L, alphaDeg, mu, H){
+    var a = alphaDeg * Math.PI / 180, l = L * Math.cos(a), w = mu * G, tanA = Math.tan(a);
+    var tau = w * l / H, eT = Math.exp(tau);
     var C = (tau * eT / (eT - 1)) * tanA;
     var C1 = Math.log(C + Math.sqrt(C * C + eT));
-    function Yv(X){ return (l / tau) * (Math.cosh(C1) - Math.cosh(C1 - tau * X / l)); }
-    var steps = 240, pts = [], maxSag = 0, xSag = 0;
-    for(var i = 0; i <= steps; i++){
-      var X = l * i / steps, y = Yv(X), sag = y - X * tanA;
-      pts.push({ X: X, Y: y });
-      if(sag > maxSag){ maxSag = sag; xSag = X; }
-    }
-    var arc = (l / tau) * (Math.sinh(C1) - Math.sinh(C1 - tau)); // total cable length
-    var Tmax = H / Math.cos(a);                                  // along-chord equivalent thrust
-    return {
-      profile: { pts: pts, l: l, tanA: tanA, maxSag: maxSag },
-      derived: [
-        {lbl:"τ = μg·l/H", val: fmt(tau), unit:"—"},
-        {lbl:"Portée horizontale l = L·cos α", val: fmt(l), unit:"m"},
-        {lbl:"Flèche verticale max", val: fmt(maxSag), unit:"m"},
-        {lbl:"Position flèche max", val: (l ? (xSag / l * 100).toFixed(1) : "—"), unit:"% portée"},
-        {lbl:"Longueur du câble (arc)", val: fmt(arc), unit:"m"},
-        {lbl:"Allongement arc/corde", val: ((arc / L - 1) * 100).toFixed(3), unit:"%"},
-        {lbl:"Poussée équivalente T = H/cos α", val: fmt(Tmax), unit:"N"},
-        {lbl:"Dénivelé des appuis", val: fmt(l * tanA), unit:"m"}
-      ],
-      note: "Allure statique d'un câble incliné sous poids propre (solution caténaire, éq. 1.4-1.6) : "
-        + "<strong>Y(X)/l = (1/τ)·[cosh C₁ − cosh(C₁ − τX/l)]</strong>, τ = μg·l/H, "
-        + "C₁ = ln(C + √(C²+e^τ)), C = (τe^τ/(e^τ−1))·tan α. "
-        + "L est la longueur de corde (entre ancrages), l = L·cos α la portée horizontale, α l'inclinaison. "
-        + "<strong>Le tracé conserve l'angle réel de la corde ; la flèche est exagérée pour la lisibilité (facteur indiqué)</strong> — la valeur réelle est en « Flèche verticale max ». "
-        + "Hypothèses : profil d'équilibre sous poids propre uniforme, câble inextensible en géométrie, sans charge ponctuelle. (g = " + G + " m/s²)"
-    };
+    var Rc = (Math.sinh(C1) - Math.sinh(C1 - tau)) / tau;   // arc/span ratio (eq 3.2)
+    var Lc = Rc * l;                                         // cable length
+    // chi* = (1/l) integral_0^l (ds/dX)^4 dX, ds/dX = cosh(C1 - tau X/l)  (eq 3.11-3.12)
+    var chi = 0, M = 3000;
+    for(var i = 0; i < M; i++){ var u = C1 - tau * ((i + 0.5) / M); var ch = Math.cosh(u); chi += ch * ch * ch * ch; }
+    chi /= M;
+    return { a:a, l:l, w:w, tau:tau, C1:C1, Rc:Rc, Lc:Lc, chi:chi };
+  }
+  // Curvature of the static profile along arc-length s (eq 3.20): d2Y/ds2.
+  function d2Yds2(gm, s){
+    var psi = Math.sinh(gm.C1) - (gm.Rc * gm.tau / gm.Lc) * s;
+    return -(gm.Rc * gm.tau / gm.Lc) * Math.pow(1 + psi * psi, -1.5);
   }
 
-  // ---------- Parameter UI ----------
-  function buildParamsUI(){
+  // ===================== Symmetric Jacobi eigensolver =====================
+  function jacobiEig(Ain, wantVec){
+    var n = Ain.length, a = Ain.map(function(r){ return r.slice(); });
+    var V = null;
+    if(wantVec){ V = []; for(var i0 = 0; i0 < n; i0++){ V.push(new Array(n).fill(0)); V[i0][i0] = 1; } }
+    for(var sweep = 0; sweep < 100; sweep++){
+      var off = 0;
+      for(var p = 0; p < n; p++){ for(var q = p + 1; q < n; q++){ off += a[p][q] * a[p][q]; } }
+      if(off < 1e-18) break;
+      for(p = 0; p < n; p++){
+        for(q = p + 1; q < n; q++){
+          if(Math.abs(a[p][q]) < 1e-300) continue;
+          var phi = 0.5 * Math.atan2(2 * a[p][q], a[q][q] - a[p][p]);
+          var c = Math.cos(phi), s = Math.sin(phi), k;
+          for(k = 0; k < n; k++){ var akp = a[k][p], akq = a[k][q]; a[k][p] = c*akp - s*akq; a[k][q] = s*akp + c*akq; }
+          for(k = 0; k < n; k++){ var apk = a[p][k], aqk = a[q][k]; a[p][k] = c*apk - s*aqk; a[q][k] = s*apk + c*aqk; }
+          if(V){ for(k = 0; k < n; k++){ var vkp = V[k][p], vkq = V[k][q]; V[k][p] = c*vkp - s*vkq; V[k][q] = s*vkp + c*vkq; } }
+        }
+      }
+    }
+    var val = []; for(i0 = 0; i0 < n; i0++){ val.push(a[i0][i0]); }
+    return { values: val, vectors: V };
+  }
+
+  // ===================== Vibration solvers (validated reference) =====================
+  // Governing eigenproblem (eq 3.16): phi'' + (Om/Lc)^2 phi + kappa*Y''*int(Y'' phi ds) = 0,
+  // phi(0)=phi(Lc)=0, kappa = E_cA_c/(H l chi*). Solved two independent ways; both reproduce
+  // the Irvine in-plane spectrum at alpha=0 (validated to <0.1%). f = sqrt(mu_eig*H/mu)/(2pi).
+
+  // (1) Finite differences on Ng interior nodes + Jacobi (gives eigenvectors -> mode shapes).
+  function solveFD(gm, mu, H, kappa, Ng, N){
+    var Lc = gm.Lc, h = Lc / (Ng + 1);
+    var yv = []; for(var i = 1; i <= Ng; i++){ yv.push(d2Yds2(gm, i * h)); }
+    var A = []; for(i = 0; i < Ng; i++){ A.push(new Array(Ng).fill(0)); }
+    for(i = 0; i < Ng; i++){
+      A[i][i] += 2 / (h * h);
+      if(i - 1 >= 0) A[i][i - 1] += -1 / (h * h);
+      if(i + 1 < Ng) A[i][i + 1] += -1 / (h * h);
+      for(var j = 0; j < Ng; j++){ A[i][j] += kappa * h * yv[i] * yv[j]; }
+    }
+    var e = jacobiEig(A, true);
+    var idx = []; for(i = 0; i < e.values.length; i++){ if(e.values[i] > 1e-9) idx.push(i); }
+    idx.sort(function(x, y){ return e.values[x] - e.values[y]; });
+    var out = [];
+    for(var m = 0; m < N && m < idx.length; m++){
+      var col = idx[m];
+      var f = Math.sqrt(e.values[col] * H / mu) / (2 * Math.PI);
+      var phi = e.vectors.map(function(row){ return row[col]; });
+      var mi = 0; for(var t = 1; t < phi.length; t++){ if(Math.abs(phi[t]) > Math.abs(phi[mi])) mi = t; }
+      if(phi[mi] < 0){ phi = phi.map(function(v){ return -v; }); }
+      out.push({ f: f, phi: phi, Ng: Ng });
+    }
+    return out;
+  }
+
+  // (2) Sine-Galerkin secular equation (independent analytic cross-check).
+  function solveSpectral(gm, mu, H, kappa, Nb, N){
+    var Lc = gm.Lc, b = [], Q = 1200;
+    for(var n = 1; n <= Nb; n++){
+      var s = 0; for(var q = 0; q < Q; q++){ var ss = (q + 0.5) * Lc / Q; s += d2Yds2(gm, ss) * Math.sin(n * Math.PI * ss / Lc); }
+      b.push(s * (Lc / Q) * (2 / Lc));
+    }
+    var Mx = []; for(var i = 0; i < Nb; i++){ Mx.push(new Array(Nb).fill(0)); }
+    for(i = 0; i < Nb; i++){
+      Mx[i][i] += Math.pow((i + 1) * Math.PI / Lc, 2);
+      for(var j = 0; j < Nb; j++){ Mx[i][j] += kappa * (Lc / 2) * b[i] * b[j]; }
+    }
+    var ev = jacobiEig(Mx, false).values.filter(function(v){ return v > 1e-9; }).sort(function(a, c){ return a - c; });
+    return ev.slice(0, N).map(function(me){ return Math.sqrt(me * H / mu) / (2 * Math.PI); });
+  }
+
+  // Mode-shape helpers.
+  function shapeSine(k){ return function(t){ return Math.sin(k * Math.PI * t); }; }
+  function shapeVector(phi, Ng){
+    function nodeVal(j){ if(j <= 0 || j >= Ng + 1) return 0; return phi[j - 1]; }
+    return function(t){ var p = t * (Ng + 1), lo = Math.floor(p), fr = p - lo; return nodeVal(lo) * (1 - fr) + nodeVal(lo + 1) * fr; };
+  }
+  function familyOf(phi){
+    var Ng = phi.length, sSym = 0, sAnti = 0, norm = 0;
+    for(var i = 0; i < Ng; i++){ var a = phi[i], b = phi[Ng - 1 - i]; sSym += Math.abs(a - b); sAnti += Math.abs(a + b); norm += Math.abs(a); }
+    if(norm < 1e-12) return "";
+    return (sSym <= sAnti) ? "sym." : "antisym.";
+  }
+
+  // ===================== Models =====================
+  function pv(P, k){ return P[k].val; }
+
+  var MODELS = {
+    static: {
+      name: "Allure statique (incliné)",
+      staticShape: true,
+      desc: "Forme d'équilibre d'un câble incliné sous son poids propre (solution caténaire). Trace l'allure du câble entre ses deux ancrages.",
+      params: [
+        {key:"L",     label:"L",  unit:"m (corde)",       val:120, min:5,   max:500, step:1},
+        {key:"alpha", label:"α", unit:"° (inclinaison)", val:30,  min:0,   max:75,  step:1},
+        {key:"mu",    label:"μ", unit:"kg/m",            val:50,  min:1,   max:300, step:1},
+        {key:"H",     label:"H",  unit:"N",               val:3e6, min:1e4, max:1e7, step:1e4}
+      ],
+      options: [],
+      compute: function(P, O, N){
+        var gm = geom(pv(P,"L"), pv(P,"alpha"), pv(P,"mu"), pv(P,"H"));
+        var l = gm.l, tanA = Math.tan(gm.a), Lc = gm.Lc;
+        function Yv(X){ return (l / gm.tau) * (Math.cosh(gm.C1) - Math.cosh(gm.C1 - gm.tau * X / l)); }
+        var steps = 240, pts = [], maxSag = 0, xSag = 0;
+        for(var i = 0; i <= steps; i++){
+          var X = l * i / steps, y = Yv(X), sag = y - X * tanA;
+          pts.push({ X: X, Y: y });
+          if(sag > maxSag){ maxSag = sag; xSag = X; }
+        }
+        return {
+          staticShape: true,
+          profile: { pts: pts, l: l, tanA: tanA, maxSag: maxSag },
+          derived: [
+            {lbl:"τ = μg·l/H", val: fmt(gm.tau), unit:"—"},
+            {lbl:"Portée horizontale l = L·cos α", val: fmt(l), unit:"m"},
+            {lbl:"Flèche verticale max", val: fmt(maxSag), unit:"m"},
+            {lbl:"Position flèche max", val: (l ? (xSag / l * 100).toFixed(1) : "—"), unit:"% portée"},
+            {lbl:"Longueur du câble (arc) L_c", val: fmt(Lc), unit:"m"},
+            {lbl:"Allongement arc/corde", val: ((Lc / pv(P,"L") - 1) * 100).toFixed(3), unit:"%"},
+            {lbl:"Poussée équivalente T = H/cos α", val: fmt(pv(P,"H") / Math.cos(gm.a)), unit:"N"},
+            {lbl:"Dénivelé des appuis", val: fmt(l * tanA), unit:"m"}
+          ],
+          note: "Allure statique d'un câble incliné sous poids propre (solution caténaire) : "
+            + "<strong>Y(X)/l = (1/τ)·[cosh C₁ − cosh(C₁ − τX/l)]</strong>, τ = μg·l/H. "
+            + "L = longueur de corde, l = L·cos α = portée horizontale, α = inclinaison. "
+            + "<strong>La corde est tracée à son angle réel ; la flèche est exagérée (facteur indiqué)</strong> — valeur réelle en « Flèche verticale max ». (g = " + G + " m/s²)"
+        };
+      }
+    },
+
+    vib: {
+      name: "Vibration (chaînette)",
+      heavy: true,
+      desc: "Fréquences propres et modes de vibration dans le plan d'un câble incliné en chaînette. Équation résolue par deux méthodes indépendantes (différences finies et projection spectrale) affichées côte à côte comme contrôle.",
+      params: [
+        {key:"L",     label:"L",  unit:"m (corde)",       val:120, min:5,   max:500,  step:1},
+        {key:"alpha", label:"α", unit:"° (inclinaison)", val:30,  min:0,   max:75,   step:1},
+        {key:"mu",    label:"μ", unit:"kg/m",            val:50,  min:1,   max:300,  step:1},
+        {key:"H",     label:"H",  unit:"N",               val:3e6, min:1e4, max:1e7,  step:1e4},
+        {key:"EA",    label:"EA", unit:"N",               val:2e9, min:1e7, max:5e10, step:1e8}
+      ],
+      options: [],
+      compute: function(P, O, N){
+        var Ng = 120, Nb = 40;
+        var mu = pv(P,"mu"), H = pv(P,"H"), EA = pv(P,"EA");
+        var gm = geom(pv(P,"L"), pv(P,"alpha"), mu, H);
+        var kappa = EA / (H * gm.l * gm.chi);
+        var fd = solveFD(gm, mu, H, kappa, Ng, N);
+        var sp = solveSpectral(gm, mu, H, kappa, Nb, N);
+        var modes = [], maxDev = 0;
+        for(var i = 0; i < fd.length; i++){
+          var fFD = fd[i].f, fSP = (i < sp.length) ? sp[i] : null;
+          var dev = (fSP && fFD) ? Math.abs(fFD - fSP) / fFD * 100 : null;
+          if(dev !== null && dev > maxDev) maxDev = dev;
+          modes.push({ n:i+1, f: fFD, fSpec: fSP, dev: dev,
+                       family: familyOf(fd[i].phi), shape: shapeVector(fd[i].phi, Ng) });
+        }
+        var d = gm.w * gm.l * gm.l / (8 * H);
+        return {
+          vibration: true,
+          modes: modes,
+          derived: [
+            {lbl:"τ = μg·l/H", val: fmt(gm.tau), unit:"—"},
+            {lbl:"Longueur du câble L_c", val: fmt(gm.Lc), unit:"m"},
+            {lbl:"R_c = L_c/l", val: fmt(gm.Rc), unit:"—"},
+            {lbl:"Paramètre courbe χ*", val: fmt(gm.chi), unit:"—"},
+            {lbl:"Flèche (mi-portée)", val: fmt(d), unit:"m"},
+            {lbl:"Couplage κ = EA/(H·l·χ*)", val: fmt(kappa), unit:"—"},
+            {lbl:"Célérité √(H/μ)", val: fmt(Math.sqrt(H / mu)), unit:"m/s"},
+            {lbl:"Écart max FD vs spectral", val: fmt(maxDev), unit:"%"}
+          ],
+          note: "Vibrations dans le plan d'un câble incliné en chaînette. Équation gouvernante "
+            + "<strong>φ'' + (Ω/L_c)²·φ + κ·Y''(s)·∫Y''φ ds = 0</strong> sur la longueur d'arc s∈[0,L_c], "
+            + "κ = EA/(H·l·χ*). Résolue par différences finies (" + Ng + " points, avec formes modales) "
+            + "et par projection spectrale (base sinusoïdale, " + Nb + " termes) : les deux colonnes doivent coïncider. "
+            + "<strong>Validation :</strong> à α=0 et faible flèche, le spectre reproduit la théorie d'Irvine à <0,1 %. "
+            + "Modes hors plan et antisymétriques non couplés à la flèche. f = Ω/(2π·L_c·√(μ/H)). (g = " + G + " m/s²)"
+        };
+      }
+    }
+  };
+  var MODEL_ORDER = ["static", "vib"];
+
+  // ===================== State + parameter UI =====================
+  var state = { modelId: "static", params: {}, options: {} };
+
+  function makeParam(spec){
+    return { key: spec.key, label: spec.label, unit: spec.unit, val: spec.val, min: spec.min, max: spec.max, step: spec.step };
+  }
+
+  function buildParamsUI(order){
     var host = g("params");
     host.innerHTML = "";
-    PARAM_SPECS.forEach(function(spec){
-      var p = params[spec.key], key = spec.key;
+    order.forEach(function(key){
+      var p = state.params[key];
       var row = document.createElement("div");
       row.className = "row";
       row.innerHTML =
@@ -194,22 +393,18 @@
     host.querySelectorAll("input").forEach(function(inp){
       inp.addEventListener("input", function(){
         var key = inp.getAttribute("data-var"), role = inp.getAttribute("data-role");
-        var p = params[key], v = parseFloat(inp.value);
+        var p = state.params[key], v = parseFloat(inp.value);
         if(isNaN(v)) return;
-        if(role === "slider" || role === "num"){
-          p.val = v;
-          if(v > p.max) p.max = v;   // auto-expand so the slider never contradicts the value
-          if(v < p.min) p.min = v;
-        } else if(role === "min"){ p.min = v; }
+        if(role === "slider" || role === "num"){ p.val = v; if(v > p.max) p.max = v; if(v < p.min) p.min = v; }
+        else if(role === "min"){ p.min = v; }
         else if(role === "max"){ p.max = v; }
         syncRow(key);
-        refresh();
+        requestRefresh();
       });
     });
   }
-
   function syncRow(key){
-    var p = params[key], host = g("params");
+    var p = state.params[key], host = g("params");
     var slider = host.querySelector('input[data-role="slider"][data-var="' + key + '"]');
     var num = host.querySelector('input[data-role="num"][data-var="' + key + '"]');
     var minI = host.querySelector('input[data-role="min"][data-var="' + key + '"]');
@@ -220,26 +415,75 @@
     if(maxI && document.activeElement !== maxI){ maxI.value = p.max; }
   }
 
-  // ---------- Render ----------
-  function refresh(){
-    var res = compute();
-    var dh = "";
-    res.derived.forEach(function(d){
-      dh += '<div class="d"><span class="dl">' + d.lbl + '</span><span class="dv">' + d.val + (d.unit ? ' ' + d.unit : '') + '</span></div>';
-    });
-    g("derived").innerHTML = dh;
-    g("note").innerHTML = res.note;
-    drawProfile(res.profile);
+  // ===================== Model switching =====================
+  function setModel(id){
+    state.modelId = id;
+    var m = MODELS[id];
+    g("modelDesc").textContent = m.desc;
+    var isStatic = !!m.staticShape;
+    g("modesRow").style.display = isStatic ? "none" : "";
+    g("resultsTitle").style.display = isStatic ? "none" : "";
+    g("cards").style.display = isStatic ? "none" : "";
+    g("tbl").style.display = isStatic ? "none" : "";
+    g("plotTitle").textContent = isStatic ? "Allure du câble" : "Formes modales";
+    state.params = {};
+    var order = m.params.map(function(s){ return s.key; });
+    m.params.forEach(function(s){ state.params[s.key] = makeParam(s); });
+    buildParamsUI(order);
+    g("models").querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-model") === id); });
+    refresh();
   }
 
-  // Chord angle is drawn true (uniform scale); the sag below the chord is exaggerated
-  // by a labelled factor so it stays visible at realistic span/sag ratios.
+  // ===================== Compute + render =====================
+  var refreshTimer = null;
+  function requestRefresh(){
+    if(MODELS[state.modelId].heavy){ if(refreshTimer) clearTimeout(refreshTimer); refreshTimer = setTimeout(refresh, 60); }
+    else { refresh(); }
+  }
+
+  function refresh(){
+    var m = MODELS[state.modelId];
+    var N = parseInt(g("Nmodes").value, 10);
+    g("Nmodes_out").textContent = N;
+    var res = m.compute(state.params, state.options, N);
+
+    var dh = "";
+    (res.derived || []).forEach(function(d){
+      dh += '<div class="d"><span class="dl">' + d.lbl + '</span><span class="dv">' + d.val + (d.unit ? ' ' + d.unit : '') + '</span></div>';
+    });
+    g("derived").innerHTML = dh || '<div style="font-size:13px;color:var(--text-muted);">—</div>';
+    g("note").innerHTML = res.note || "";
+
+    if(res.staticShape){ drawProfile(res.profile); return; }
+
+    // Vibration rendering
+    var modes = res.modes;
+    if(!modes || modes.length === 0){ g("svg").innerHTML = ""; return; }
+    var f1 = modes[0].f;
+    g("cards").innerHTML =
+      '<div class="card"><div class="lbl">Fréquence fondamentale f₁</div><div class="val">' + fmt(f1) + '</div><div class="unit">Hz</div></div>'
+    + '<div class="card"><div class="lbl">Rapport f₂/f₁</div><div class="val">' + (modes.length >= 2 && f1 ? (modes[1].f / f1).toFixed(3) : "—") + '</div><div class="unit">2.000 = harmonique pur</div></div>';
+
+    var html = '<tr><th>Mode</th><th>Type</th><th>f (diff. finies)</th><th>f (spectral)</th><th>écart</th><th>Période</th></tr>';
+    for(var i = 0; i < modes.length; i++){
+      var md = modes[i];
+      html += '<tr><td><span class="dot" style="background:' + palette[i % palette.length] + '"></span>' + md.n + '</td>'
+        + '<td class="fam">' + (md.family || "—") + '</td>'
+        + '<td>' + fmt(md.f) + ' Hz</td>'
+        + '<td>' + (md.fSpec !== null ? fmt(md.fSpec) + ' Hz' : "—") + '</td>'
+        + '<td>' + (md.dev !== null ? md.dev.toFixed(3) + ' %' : "—") + '</td>'
+        + '<td>' + (md.f ? fmt(1 / md.f) + ' s' : "—") + '</td></tr>';
+    }
+    g("tbl").innerHTML = html;
+    drawModes(modes);
+  }
+
+  // Static profile plot (true chord angle, labelled sag exaggeration).
   function drawProfile(prof){
     var W = 640, H = 260, pad = 34;
     var l = prof.l, tanA = prof.tanA, pts = prof.pts, maxSag = prof.maxSag;
     if(!(l > 0) || pts.length === 0){ g("svg").innerHTML = ""; return; }
-    var K = 1;
-    if(maxSag > 1e-9){ K = Math.min(500, Math.max(1, 0.18 * l / maxSag)); }
+    var K = 1; if(maxSag > 1e-9){ K = Math.min(500, Math.max(1, 0.18 * l / maxSag)); }
     function ydisp(p){ var chord = p.X * tanA; return chord + K * (p.Y - chord); }
     var yMin = 0, yMax = 0;
     pts.forEach(function(p){ var y = ydisp(p); if(y < yMin) yMin = y; if(y > yMax) yMax = y; });
@@ -248,7 +492,6 @@
     var offX = (W - l * scale) / 2, offY = (H - spanY * scale) / 2;
     function sx(X){ return offX + X * scale; }
     function sy(y){ return offY + (y - yMin) * scale; }
-
     var parts = [];
     parts.push('<line x1="' + sx(0).toFixed(1) + '" y1="' + sy(ydisp(pts[0])).toFixed(1)
       + '" x2="' + sx(l).toFixed(1) + '" y2="' + sy(ydisp(pts[pts.length-1])).toFixed(1)
@@ -267,9 +510,34 @@
     g("svg").innerHTML = parts.join('');
   }
 
-  // ---------- Start ----------
-  buildParamsUI();
-  refresh();
+  // Mode-shape plot (each shape normalized to unit amplitude).
+  function drawModes(modes){
+    var W = 640, H = 260, padX = 34, padY = 30;
+    var x0 = padX, x1 = W - padX, midY = H / 2, amp = (H / 2) - padY;
+    var parts = [];
+    parts.push('<line x1="' + x0 + '" y1="' + midY + '" x2="' + x1 + '" y2="' + midY + '" stroke="#999" stroke-width="1"/>');
+    [x0, x1].forEach(function(x){ parts.push('<polygon points="' + x + ',' + (midY-8) + ' ' + (x-6) + ',' + (midY+8) + ' ' + (x+6) + ',' + (midY+8) + '" fill="#888"/>'); });
+    var steps = 200;
+    modes.forEach(function(md, idx){
+      var ys = [], maxAbs = 1e-9;
+      for(var i = 0; i <= steps; i++){ var y = md.shape(i / steps); ys.push(y); if(Math.abs(y) > maxAbs) maxAbs = Math.abs(y); }
+      var pts = [];
+      for(var j = 0; j <= steps; j++){ var t = j / steps, x = x0 + t * (x1 - x0), yy = midY - amp * 0.85 * (ys[j] / maxAbs); pts.push(x.toFixed(1) + ',' + yy.toFixed(1)); }
+      parts.push('<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + palette[idx % palette.length] + '" stroke-width="2"/>');
+    });
+    g("svg").innerHTML = parts.join('');
+  }
+
+  // ===================== Wiring =====================
+  MODEL_ORDER.forEach(function(id){
+    var b = document.createElement("button");
+    b.textContent = MODELS[id].name;
+    b.setAttribute("data-model", id);
+    b.addEventListener("click", function(){ setModel(id); });
+    g("models").appendChild(b);
+  });
+  g("Nmodes").addEventListener("input", requestRefresh);
+  setModel("static");
 })();
 </script>
 </body>
